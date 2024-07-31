@@ -162,8 +162,8 @@ resource "aws_s3_bucket_intelligent_tiering_configuration" "this" {
 }
 
 resource "aws_s3_bucket_inventory" "this" {
-  count                    = length(var.bucket) == 0 ? 0 : length(var.bucket_inventory)
-  bucket                   = try(
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_inventory)
+  bucket = try(
     element(aws_s3_bucket.this.*.id, lookup(var.bucket_inventory[count.index], "bucket_id"))
   )
   included_object_versions = lookup(var.bucket_inventory[count.index], "included_object_versions")
@@ -190,7 +190,7 @@ resource "aws_s3_bucket_inventory" "this" {
               dynamic "sse_kms" {
                 for_each = lookup(encryption.value, "sse_kms") == null ? [] : ["sse_kms"]
                 content {
-                  key_id = ""
+                  key_id = lookup(sse_kms.value, "key_id")
                 }
               }
             }
@@ -211,6 +211,272 @@ resource "aws_s3_bucket_inventory" "this" {
     for_each = lookup(var.bucket_inventory[count.index], "filter") == null ? [] : ["filter"]
     content {
       prefix = lookup(filter.value, "prefix")
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_lifecycle_configuration)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_lifecycle_configuration[count.index], "bucket_id"))
+  )
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_lifecycle_configuration[count.index], "bucket_id"))
+  )
+
+  dynamic "rule" {
+    for_each = lookup(var.bucket_lifecycle_configuration[count.index], "rule")
+    content {
+      id     = lookup(rule.value, "id")
+      status = lookup(rule.value, "status")
+
+      dynamic "abort_incomplete_multipart_upload" {
+        for_each = try(lookup(rule.value, "abort_incomplete_multipart_upload") == null ? [] : ["abort_incomplete_multipart_upload"])
+        content {
+          days_after_initiation = lookup(abort_incomplete_multipart_upload.value, "days_after_initiation")
+        }
+      }
+
+      dynamic "expiration" {
+        for_each = try(lookup(rule.value, "expiration") == null ? [] : ["expiration"])
+        content {
+          date                         = lookup(expiration.value, "date")
+          days                         = lookup(expiration.value, "days")
+          expired_object_delete_marker = lookup(expiration.value, "expired_object_delete_marker")
+        }
+      }
+
+      dynamic "filter" {
+        for_each = try(lookup(rule.value, "filter") == null ? [] : ["filter"])
+        content {
+          object_size_greater_than = lookup(filter.value, "object_size_greater_than")
+          object_size_less_than    = lookup(filter.value, "object_size_less_than")
+          prefix                   = lookup(filter.value, "prefix")
+
+          dynamic "and" {
+            for_each = try(lookup(filter.value, "and") == null ? [] : ["and"])
+            content {
+              object_size_greater_than = lookup(and.value, "object_size_greater_than")
+              object_size_less_than    = lookup(and.value, "object_size_less_than")
+              prefix                   = lookup(and.value, "prefix")
+              tags = merge(
+                var.tags,
+                data.aws_default_tags.this.tags,
+                lookup(and.value, "tags")
+              )
+            }
+          }
+
+          dynamic "tag" {
+            for_each = try(lookup(filter.value, "tag") == null ? [] : ["tag"])
+            content {
+              key   = lookup(tag.value, "key")
+              value = lookup(tag.value, "value")
+            }
+          }
+        }
+      }
+
+      dynamic "noncurrent_version_expiration" {
+        for_each = try(lookup(rule.value, "noncurrent_version_expiration") == null ? [] : ["noncurrent_version_expiration"])
+        content {
+          newer_noncurrent_versions = lookup(noncurrent_version_expiration.value, "newer_noncurrent_versions")
+          noncurrent_days           = lookup(noncurrent_version_expiration.value, "noncurrent_days")
+        }
+      }
+
+      dynamic "noncurrent_version_transition" {
+        for_each = try(lookup(rule.value, "noncurrent_version_transition") == null ? [] : ["noncurrent_version_transition"])
+        content {
+          storage_class             = lookup(noncurrent_version_transition.value, "storage_class")
+          newer_noncurrent_versions = lookup(noncurrent_version_transition.value, "newer_noncurrent_versions")
+          noncurrent_days           = lookup(noncurrent_version_transition.value, "noncurrent_days")
+        }
+      }
+
+      dynamic "transition" {
+        for_each = try(lookup(rule.value, "transition") == null ? [] : ["transition"])
+        content {
+          storage_class = lookup(transition.value, "storage_class")
+          date          = lookup(transition.value, "date")
+          days          = lookup(transition.value, "days")
+        }
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_logging" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_logging)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_logging[count.index], "bucket_id"))
+  )
+  target_bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_logging[count.index], "target_bucket_id"))
+  )
+  target_prefix = lookup(var.bucket_logging[count.index], "target_prefix")
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_logging[count.index], "expected_bucket_owner_id"))
+  )
+
+  dynamic "target_grant" {
+    for_each = lookup(var.bucket_logging[count.index], "target_grant") == null ? [] : ["target_grant"]
+    content {
+      permission = lookup(target_grant.value, "permission")
+
+      dynamic "grantee" {
+        for_each = lookup(target_grant.value, "grantee")
+        content {
+          type          = lookup(grantee.value, "type")
+          email_address = lookup(grantee.value, "email_address")
+          id            = lookup(grantee.value, "id")
+          uri           = lookup(grantee.value, "uri")
+        }
+      }
+    }
+  }
+
+  dynamic "target_object_key_format" {
+    for_each = lookup(var.bucket_logging[count.index], "target_object_key_format") == null ? [] : ["target_object_key_format"]
+    content {
+      dynamic "partitioned_prefix" {
+        for_each = lookup(target_object_key_format.value, "partitioned_prefix") == null ? [] : ["partitioned_prefix"]
+        content {
+          partition_date_source = lookup(partitioned_prefix.value, "partition_date_source")
+        }
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_metric" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_metric)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_metric[count.index], "bucket_id"))
+  )
+  name = lookup(var.bucket_metric[count.index], "name")
+
+  dynamic "filter" {
+    for_each = lookup(var.bucket_metric[count.index], "filter") == null ? [] : ["filter"]
+    content {
+      tags = merge(
+        data.aws_default_tags.this.tags,
+        var.tags,
+        lookup(filter.value, "tags")
+      )
+      prefix = lookup(filter.value, "prefix")
+      access_point = try(
+        element(var.s3_access_point_arn, lookup(filter.value, "access_point_id"))
+      )
+    }
+  }
+}
+
+resource "aws_s3_bucket_notification" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_notification)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_notification[count.index], "bucket_id"))
+  )
+  eventbridge = lookup(var.bucket_notification[count.index], "eventbridge")
+
+  dynamic "lambda_function" {
+    for_each = lookup(var.bucket_notification[count.index], "lambda_function") == null ? [] : ["lambda_function"]
+    content {
+      events        = lookup(lambda_function.value, "events")
+      filter_prefix = lookup(lambda_function.value, "filter_prefix")
+      filter_suffix = lookup(lambda_function.value, "filter_suffix")
+      id            = lookup(lambda_function.value, "id")
+      lambda_function_arn = try(
+        element(var.lambda_function_arn, lookup(lambda_function.value, "lambda_function_id"))
+      )
+    }
+  }
+
+  dynamic "queue" {
+    for_each = lookup(var.bucket_notification[count.index], "queue") == null ? [] : ["queue"]
+    content {
+      events = lookup(queue.value, "events")
+      queue_arn = try(
+        element(var.sqs_queue_arn, lookup(queue.value, "queue_id"))
+      )
+      filter_prefix = lookup(queue.value, "filter_prefix")
+      filter_suffix = lookup(queue.value, "filter_suffix")
+      id            = lookup(queue.value, "id")
+    }
+  }
+
+  dynamic "topic" {
+    for_each = lookup(var.bucket_notification[count.index], "topic") == null ? [] : ["topic"]
+    content {
+      topic_arn = try(
+        element(var.sns_topic_arn, lookup(topic.value, "topic_id"))
+      )
+      events        = lookup(topic.value, "events")
+      filter_prefix = lookup(topic.value, "filter_prefix")
+      filter_suffix = lookup(topic.value, "filter_suffix")
+      id            = lookup(topic.value, "id")
+    }
+  }
+}
+
+resource "aws_s3_bucket_object" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_object)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_object[count.index], "bucket_id"))
+  )
+  key                 = lookup(var.bucket_object[count.index], "key")
+  acl                 = lookup(var.bucket_object[count.index], "acl")
+  bucket_key_enabled  = lookup(var.bucket_object[count.index], "bucket_key_enabled")
+  cache_control       = lookup(var.bucket_object[count.index], "cache_control")
+  content             = lookup(var.bucket_object[count.index], "content")
+  content_base64      = lookup(var.bucket_object[count.index], "content_base64")
+  content_disposition = lookup(var.bucket_object[count.index], "content_disposition")
+  content_encoding    = lookup(var.bucket_object[count.index], "content_encoding")
+  content_language    = lookup(var.bucket_object[count.index], "content_language")
+  content_type        = lookup(var.bucket_object[count.index], "content_type")
+  etag                = filemd5(join("/", [path.cwd, "etag", lookup(var.bucket_object[count.index], "etag")]))
+  force_destroy       = lookup(var.bucket_object[count.index], "force_destroy")
+  id                  = lookup(var.bucket_object[count.index], "id")
+  kms_key_id = try(
+    element(var.bucket_object_kms_key_arn, lookup(var.bucket_object[count.index], "kms_key_id"))
+  )
+  metadata                      = lookup(var.bucket_object[count.index], "metadata")
+  object_lock_legal_hold_status = lookup(var.bucket_object[count.index], "object_lock_legal_hold_status")
+  object_lock_mode              = lookup(var.bucket_object[count.index], "object_lock_mode")
+  object_lock_retain_until_date = lookup(var.bucket_object[count.index], "object_lock_retain_until_date")
+  server_side_encryption        = lookup(var.bucket_object[count.index], "server_side_encryption")
+  source                        = lookup(var.bucket_object[count.index], "source")
+  source_hash                   = filemd5(join("/", [path.cwd, "etag", lookup(var.bucket_object[count.index], "source_hash")]))
+  storage_class                 = lookup(var.bucket_object[count.index], "storage_class")
+  tags = merge(
+    data.aws_default_tags.this.tags,
+    var.tags,
+    lookup(var.bucket_object[count.index], "tags")
+  )
+  website_redirect = lookup(var.bucket_object[count.index], "website_redirect")
+}
+
+resource "aws_s3_bucket_object_lock_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_object_lock_configuration)
+  bucket                = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_object_lock_configuration[count.index], "bucket_id"))
+  )
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_object_lock_configuration[count.index], "expected_bucket_owner_id"))
+  )
+  object_lock_enabled   = lookup(var.bucket_object_lock_configuration[count.index], "object_lock_enabled")
+
+  dynamic "rule" {
+    for_each = lookup(var.bucket_object_lock_configuration[count.index], "rule") == null ? [] : ["rule"]
+    content {
+      dynamic "default_retention" {
+        for_each = lookup(rule.value, "default_retention")
+        content {
+          days  = lookup(default_retention.value, "days")
+          mode  = lookup(default_retention.value, "mode")
+          years = lookup(default_retention.value, "years")
+        }
+      }
     }
   }
 }

@@ -22,6 +22,10 @@ run "create_s3_bucket" {
           Name        = "My bucket"
           Environment = "Dev"
         }
+      },
+      {
+        id      = 1
+        bucket  = "my-tf-log-bucket"
       }
     ]
     bucket_accelerate_configuration = [
@@ -36,6 +40,11 @@ run "create_s3_bucket" {
         id        = 0
         bucket_id = 0
         acl       = "public-read"
+      },
+      {
+        id        = 1
+        bucket_id = 1
+        acl       = "log-delivery-write"
       }
     ]
     bucket_analytics_configuratio = [
@@ -112,6 +121,51 @@ run "create_s3_bucket" {
                 format     = "ORC"
                 bucket_arn = aws_s3_bucket.inventory.arn
                 prefix     = "inventory"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+    bucket_logging = [
+      {
+        id                = 0
+        bucket_id         = 0
+        target_bucket_id  = 1
+        target_prefix     = "log/"
+      }
+    ]
+    bucket_metric = [
+      {
+        id        = 0
+        bucket_id = 0
+        name      = "ImportantBlueDocuments"
+        filter = [
+          {
+            access_point_id = aws_s3_access_point.example-access-point.arn
+          }
+        ]
+      }
+    ]
+    bucket_object = [
+      {
+        id                     = 0
+        key                    = "someobject"
+        bucket_id              = 0
+        source                 = "index.html"
+        server_side_encryption = "AES256"
+      }
+    ]
+    bucket_object_lock_configuration = [
+      {
+        id        = 0
+        bucket_id = 0
+        rule = [
+          {
+            default_retention = [
+              {
+                mode = "COMPLIANCE"
+                days = 5
               }
             ]
           }
