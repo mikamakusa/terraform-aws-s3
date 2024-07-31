@@ -62,5 +62,61 @@ run "create_s3_bucket" {
         ]
       }
     ]
+    bucket_cors_coonfiguration = [
+      {
+        id        = 0
+        bucket_id = 0
+        cors_rule = [
+          {
+            allowed_headers = ["*"]
+            allowed_methods = ["PUT", "POST"]
+            allowed_origins = ["https://s3-website-test.hashicorp.com"]
+            expose_headers = ["ETag"]
+            max_age_seconds = 3000
+          }
+        ]
+      }
+    ]
+    bucket_intelligent_tiering_configuration = [
+      {
+        id        = 0
+        bucket_id = 0
+        name      = "EntireBucket"
+        tiering = [
+          {
+            access_tier = "DEEP_ARCHIVE_ACCESS"
+            days        = 180
+          },
+          {
+            access_tier = "ARCHIVE_ACCESS"
+            days        = 125
+          }
+        ]
+      }
+    ]
+    bucket_inventory = [
+      {
+        id                        = 0
+        bucket_id                 = 0
+        name                      = "DocumentsWeekly"
+        included_object_versions  = "All"
+        schedule = [
+          {
+            frequency = "Daily"
+          }
+        ]
+        destination = [
+          {
+            bucket = [
+              {
+                format     = "ORC"
+                bucket_arn = aws_s3_bucket.inventory.arn
+                prefix     = "inventory"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

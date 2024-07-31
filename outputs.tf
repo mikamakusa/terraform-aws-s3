@@ -19,3 +19,23 @@ output "s3_bucket_accelerate_configuration_id" {
 output "s3_bucket_analytics_configuration_id" {
   value = try(aws_s3_bucket_analytics_configuration.this.*.id)
 }
+
+output "s3_bucket_cors_configuration_id" {
+  value = try(aws_s3_bucket_cors_configuration.this.*.id)
+}
+
+output "s3_bucket_cors_rules" {
+  value = try(aws_s3_bucket_cors_configuration.this.*.cors_rule)
+}
+
+output "bucket_intelligent_tieiring_configuration_id" {
+  value = try(
+    aws_s3_bucket_intelligent_tiering_configuration.this.*.id
+  )
+}
+
+output "bucket_inventory_id" {
+  value = try(
+    aws_s3_bucket_inventory.this.*.id
+  )
+}
