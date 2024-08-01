@@ -26,6 +26,11 @@ run "create_s3_bucket" {
       {
         id      = 1
         bucket  = "my-tf-log-bucket"
+      },
+      {
+        id            = 2
+        bucket        = "third-bucket"
+        force_destroy = true
       }
     ]
     bucket_accelerate_configuration = [
@@ -166,6 +171,93 @@ run "create_s3_bucket" {
               {
                 mode = "COMPLIANCE"
                 days = 5
+              }
+            ]
+          }
+        ]
+      }
+    ]
+    bucket_ownership_controls = [
+      {
+        id        = 0
+        bucket_id = 0
+        rule = [
+          {
+            object_ownership = "BucketOwnerPreferred"
+          }
+        ]
+      }
+    ]
+    bucket_public_access_block = [
+      {
+        id                      = 0
+        bucket_id               = 0
+        block_public_acls       = true
+        block_public_policy     = true
+        ignore_public_acls      = true
+        restrict_public_buckets = true
+      },
+      {
+        id                      = 1
+        bucket_id               = 1
+        block_public_acls       = false
+        block_public_policy     = true
+        ignore_public_acls      = false
+        restrict_public_buckets = true
+      },
+      {
+        id                      = 2
+        bucket_id               = 2
+        block_public_acls       = true
+        block_public_policy     = false
+        ignore_public_acls      = true
+        restrict_public_buckets = false
+      }
+    ]
+    bucket_versioning = [
+      {
+        id        = 0
+        bucket_id = 0
+        versioning_configuration = [
+          {
+            status = "Enabled"
+          }
+        ]
+      },
+      {
+        id        = 0
+        bucket_id = 2
+        versioning_configuration = [
+          {
+            status = "Disabled"
+          }
+        ]
+      }
+    ]
+    bucket_website_configuration = [
+      {
+        id        = 0
+        bucket_id = 2
+        index_document = [
+          {
+            suffix = "index.html"
+          }
+        ]
+        error_document = [
+          {
+            key = "error.html"
+          }
+        ]
+        routing_rule = [
+          {
+            condition = [
+              {
+                key_prefix_equals = "docs/"
+              }
+            ]
+            redirect = [
+              {
+                replace_key_prefix_with = "documents/"
               }
             ]
           }

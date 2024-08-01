@@ -458,13 +458,13 @@ resource "aws_s3_bucket_object" "this" {
 
 resource "aws_s3_bucket_object_lock_configuration" "this" {
   count = length(var.bucket) == 0 ? 0 : length(var.bucket_object_lock_configuration)
-  bucket                = try(
+  bucket = try(
     element(aws_s3_bucket.this.*.id, lookup(var.bucket_object_lock_configuration[count.index], "bucket_id"))
   )
   expected_bucket_owner = try(
     element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_object_lock_configuration[count.index], "expected_bucket_owner_id"))
   )
-  object_lock_enabled   = lookup(var.bucket_object_lock_configuration[count.index], "object_lock_enabled")
+  object_lock_enabled = lookup(var.bucket_object_lock_configuration[count.index], "object_lock_enabled")
 
   dynamic "rule" {
     for_each = lookup(var.bucket_object_lock_configuration[count.index], "rule") == null ? [] : ["rule"]
@@ -475,6 +475,285 @@ resource "aws_s3_bucket_object_lock_configuration" "this" {
           days  = lookup(default_retention.value, "days")
           mode  = lookup(default_retention.value, "mode")
           years = lookup(default_retention.value, "years")
+        }
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_ownership_controls" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_ownership_controls)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_ownership_controls[count.index], "bucket_id"))
+  )
+
+  dynamic "rule" {
+    for_each = lookup(var.bucket_ownership_controls[count.index], "rule")
+    content {
+      object_ownership = lookup(rule.value, "object_ownership")
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_policy)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_policy[count.index], "bucket_id"))
+  )
+  policy = try(
+    element(var.bucket_policy_json, lookup(var.bucket_policy[count.index], "policy_id"))
+  )
+}
+
+resource "aws_s3_bucket_public_access_block" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_public_access_block)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_public_access_block[count.index], "bucket_id"))
+  )
+  block_public_acls       = lookup(var.bucket_public_access_block[count.index], "block_public_acls")
+  block_public_policy     = lookup(var.bucket_public_access_block[count.index], "block_public_policy")
+  ignore_public_acls      = lookup(var.bucket_public_access_block[count.index], "ignore_public_acls")
+  restrict_public_buckets = lookup(var.bucket_public_access_block[count.index], "restrict_public_buckets")
+}
+
+resource "aws_s3_bucket_replication_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_replication_configuration)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_replication_configuration[count.index], "bucket_id"))
+  )
+  role = try(
+    element(var.bucket_replication_configuration_role_arn, lookup(var.bucket_replication_configuration[count.index], "role_id"))
+  )
+  token = lookup(var.bucket_replication_configuration[count.index], "token")
+
+  dynamic "rule" {
+    for_each = lookup(var.bucket_replication_configuration[count.index], "rule")
+    content {
+      status   = lookup(rule.value, "status")
+      id       = lookup(rule.value, "id")
+      priority = lookup(rule.value, "priority")
+
+      dynamic "destination" {
+        for_each = lookup(rule.value, "destination")
+        content {
+          bucket = try(
+            element(aws_s3_bucket.this.*.arn, lookup(destination.value, "bucket_id"))
+          )
+          storage_class = lookup(destination.value, "storage_class")
+
+          dynamic "access_control_translation" {
+            for_each = lookup(destination.value, "access_control_translation") == null ? [] : ["access_control_translation"]
+            content {
+              owner = lookup(access_control_translation.value, "owner")
+            }
+          }
+
+          dynamic "encryption_configuration" {
+            for_each = lookup(destination.value, "encryption_configuration") == null ? [] : ["encryption_configuration"]
+            content {
+              replica_kms_key_id = try(
+                element(var.replica_kms_key_id, lookup(encryption_configuration.value, "replica_kms_key_id"))
+              )
+            }
+          }
+
+          dynamic "metrics" {
+            for_each = lookup(destination.value, "metrics") == null ? [] : ["metrics"]
+            content {
+              status = lookup(metrics.value, "status")
+
+              dynamic "event_threshold" {
+                for_each = lookup(metrics.value, "event_threshold") == null ? [] : ["event_threshold"]
+                content {
+                  minutes = lookup(event_threshold.value, "minutes")
+                }
+              }
+            }
+          }
+
+          dynamic "replication_time" {
+            for_each = lookup(destination.value, "replication_time") == null ? [] : ["replication_time"]
+            content {
+              status = lookup(replication_time.value, "status")
+
+              dynamic "time" {
+                for_each = lookup(replication_time.value, "time") == null ? [] : ["replication_time"]
+                content {
+                  minutes = lookup(time.value, "time")
+                }
+              }
+            }
+          }
+        }
+      }
+
+      dynamic "delete_marker_replication" {
+        for_each = lookup(rule.value, "delete_marker_replication") == null ? [] : ["delete_marker_replication"]
+        content {
+          status = lookup(delete_marker_replication.value, "status")
+        }
+      }
+
+      dynamic "existing_object_replication" {
+        for_each = lookup(rule.value, "existing_object_replication") == null ? [] : ["existing_object_replication"]
+        content {
+          status = lookup(existing_object_replication.value, "status")
+        }
+      }
+
+      dynamic "filter" {
+        for_each = lookup(rule.value, "filter") == null ? [] : ["filter"]
+        content {
+          prefix = lookup(filter.value, "prefix")
+
+          dynamic "and" {
+            for_each = lookup(filter.value, "and") == null ? [] : ["and"]
+            content {
+              prefix = lookup(and.value, "prefix")
+              tags   = lookup(and.value, "tags")
+            }
+          }
+
+          dynamic "tag" {
+            for_each = lookup(filter.value, "tag") == null ? [] : ["tag"]
+            content {
+              key   = lookup(tag.value, "key")
+              value = lookup(tag.value, "value")
+            }
+          }
+        }
+      }
+
+      dynamic "source_selection_criteria" {
+        for_each = lookup(rule.value, "source_selection_criteria") == null ? [] : ["source_selection_criteria"]
+        content {
+          dynamic "replica_modifications" {
+            for_each = lookup(source_selection_criteria.value, "replica_modifications") == null ? [] : ["replica_modifications"]
+            content {
+              status = lookup(replica_modifications.value, "status")
+            }
+          }
+
+          dynamic "sse_kms_encrypted_objects" {
+            for_each = lookup(source_selection_criteria.value, "sse_kms_encrypted_objects") == null ? [] : ["sse_kms_encrypted_objects"]
+            content {
+              status = lookup(sse_kms_encrypted_objects.value, "status")
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_request_payment_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_request_payment_configuration)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_request_payment_configuration[count.index], "bucket_id"))
+  )
+  payer = lookup(var.bucket_request_payment_configuration[count.index], "payer")
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_request_payment_configuration[count.index], "expected_bucket_owner_id"))
+  )
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_server_side_encryption_configuration)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_server_side_encryption_configuration[count.index], "bucket_id"))
+  )
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_server_side_encryption_configuration[count.index], "expected_bucket_owner_id"))
+  )
+
+  dynamic "rule" {
+    for_each = lookup(var.bucket_server_side_encryption_configuration[count.index], "rule")
+    content {
+      bucket_key_enabled = lookup(rule.value, "bucket_key_enabled")
+
+      dynamic "apply_server_side_encryption_by_default" {
+        for_each = lookup(rule.value, "apply_server_side_encryption_by_default") == null ? [] : ["apply_server_side_encryption_by_default"]
+        content {
+          sse_algorithm = lookup(apply_server_side_encryption_by_default.value, "sse_algorithm")
+          kms_master_key_id = try(
+            element(var.bucket_server_side_encryption_configuration_kms_key_arn, lookup(apply_server_side_encryption_by_default.value, "kms_master_key_id"))
+          )
+        }
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_versioning)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_versioning[count.index], "bucket_id"))
+  )
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_server_side_encryption_configuration[count.index], "expected_bucket_owner_id"))
+  )
+  mfa = lookup(var.bucket_versioning[count.index], "mfa")
+
+  dynamic "versioning_configuration" {
+    for_each = lookup(var.bucket_versioning[count.index], "versioning_configuration") == null ? [] : ["versioning_configuration"]
+    content {
+      status     = lookup(versioning_configuration.value, "status")
+      mfa_delete = lookup(versioning_configuration.value, "mfa_delete")
+    }
+  }
+}
+
+resource "aws_s3_bucket_website_configuration" "this" {
+  count = length(var.bucket) == 0 ? 0 : length(var.bucket_website_configuration)
+  bucket = try(
+    element(aws_s3_bucket.this.*.id, lookup(var.bucket_website_configuration[count.index], "bucket_id"))
+  )
+  expected_bucket_owner = try(
+    element(aws_s3_bucket_accelerate_configuration.this.*.expected_bucket_owner, lookup(var.bucket_website_configuration[count.index], "expected_bucket_owner_id"))
+  )
+  routing_rules = lookup(var.bucket_website_configuration[count.index], "routing_rules")
+
+  dynamic "error_document" {
+    for_each = lookup(var.bucket_website_configuration[count.index], "error_document") == null ? [] : ["error_document"]
+    content {
+      key = lookup(error_document.value, "key")
+    }
+  }
+
+  dynamic "index_document" {
+    for_each = lookup(var.bucket_website_configuration[count.index], "index_document") == null ? [] : ["index_document"]
+    content {
+      suffix = lookup(index_document.value, "suffix")
+    }
+  }
+
+  dynamic "redirect_all_requests_to" {
+    for_each = lookup(var.bucket_website_configuration[count.index], "redirect_all_requests_to") == null ? [] : ["redirect_all_requests_to"]
+    content {
+      host_name = lookup(redirect_all_requests_to.value, "host_name")
+      protocol  = lookup(redirect_all_requests_to.value, "protocol")
+    }
+  }
+
+  dynamic "routing_rule" {
+    for_each = lookup(var.bucket_website_configuration[count.index], "routing_rule") == null ? [] : ["routing_rule"]
+    content {
+      dynamic "condition" {
+        for_each = lookup(routing_rule.value, "condition")
+        content {
+          http_error_code_returned_equals = lookup(condition.value, "http_error_code_returned_equals")
+          key_prefix_equals               = lookup(condition.value, "key_prefix_equals")
+        }
+      }
+
+      dynamic "redirect" {
+        for_each = lookup(routing_rule.value, "redirect")
+        content {
+          host_name               = lookup(redirect.value, "host_name")
+          http_redirect_code      = lookup(redirect.value, "http_redirect_code")
+          protocol                = lookup(redirect.value, "protocol")
+          replace_key_prefix_with = lookup(redirect.value, "replace_key_prefix_with")
+          replace_key_with        = lookup(redirect.value, "replace_key_with")
         }
       }
     }

@@ -28,6 +28,26 @@ variable "bucket_object_kms_key_arn" {
   default = null
 }
 
+variable "bucket_policy_json" {
+  type    = string
+  default = null
+}
+
+variable "bucket_replication_configuration_role_arn" {
+  type    = string
+  default = null
+}
+
+variable "replica_kms_key_id" {
+  type    = string
+  default = null
+}
+
+variable "bucket_server_side_encryption_configuration_kms_key_arn" {
+  type    = string
+  default = null
+}
+
 variable "bucket" {
   type = list(object({
     id                  = number
@@ -449,5 +469,270 @@ variable "bucket_object_lock_configuration" {
       for a in var.bucket_object_lock_configuration : true if contains(["GOVERNANCE", "COMPLIANCE"], a.rule.default_retention.mode)
     ]) == length(var.bucket_object_lock_configuration)
     error_message = "Valid values are GOVERNANCE and COMPLIANCE."
+  }
+}
+
+variable "bucket_ownership_controls" {
+  type = list(object({
+    id        = number
+    bucket_id = any
+    rule = list(object({
+      object_ownership = string
+    }))
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_ownership_controls : true if contains(["BucketOwnerPreferred", "ObjectWriter", "BucketOwnerEnforced"], a.rule.object_ownership)
+    ]) == length(var.bucket_ownership_controls)
+    error_message = "Valid values are BucketOwnerPreferred, ObjectWriter or BucketOwnerEnforced."
+  }
+}
+
+variable "bucket_policy" {
+  type = list(object({
+    id        = number
+    bucket_id = any
+    policy_id = any
+  }))
+  default = []
+}
+
+variable "bucket_public_access_block" {
+  type = list(object({
+    id                      = number
+    bucket_id               = any
+    block_public_acls       = optional(bool)
+    block_public_policy     = optional(bool)
+    ignore_public_acls      = optional(bool)
+    restrict_public_buckets = optional(bool)
+  }))
+  default = []
+}
+
+variable "bucket_replication_configuration" {
+  type = list(object({
+    id        = number
+    bucket_id = any
+    role_id   = any
+    token     = optional(string)
+    rule = list(object({
+      status   = string
+      id       = optional(string)
+      priority = optional(string)
+      destination = list(object({
+        bucket_id     = any
+        storage_class = optional(string)
+        access_control_translation = optional(list(object({
+          owner = string
+        })))
+        encryption_configuration = optional(list(object({
+          replica_kms_key_id = any
+        })))
+        metrics = optional(list(object({
+          status = string
+          event_threshold = optional(list(object({
+            minutes = string
+          })))
+        })))
+        replication_time = optional(list(object({
+          status = string
+          time = list(object({
+            minutes = string
+          }))
+        })))
+      }))
+      delete_marker_replication = optional(list(object({
+        status = string
+      })))
+      existing_object_replication = optional(list(object({
+        status = string
+      })))
+      filter = optional(list(object({
+        prefix = optional(string)
+        and = optional(list(object({
+          prefix = optional(string)
+          tags   = optional(map(string))
+        })))
+        tag = optional(list(object({
+          key   = string
+          value = string
+        })))
+      })))
+      source_selection_criteria = optional(list(object({
+        replica_modifications = optional(list(object({
+          status = string
+        })))
+        sse_kms_encrypted_objects = optional(list(object({
+          status = string
+        })))
+      })))
+    }))
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], a.rule.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for b in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], b.rule.delete_marker_replication.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for c in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], c.rule.destination.metrics.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for d in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], d.rule.destination.replication_time.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for e in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], e.rule.existing_object_replication.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for f in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], f.rule.source_selection_criteria.replica_modifications.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for g in var.bucket_replication_configuration : true if contains(["Enabled", "Disabled"], g.rule.source_selection_criteria.sse_kms_encrypted_objects.status)
+    ]) == length(var.bucket_replication_configuration)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+}
+
+variable "bucket_request_payment_configuration" {
+  type = list(object({
+    id                       = number
+    bucket_id                = any
+    payer                    = string
+    expected_bucket_owner_id = optional(any)
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_request_payment_configuration : true if contains(["BucketOwner", "Requester"], a.payer)
+    ]) == length(var.bucket_request_payment_configuration)
+    error_message = "Valid values are BucketOwner or Requester."
+  }
+}
+
+variable "bucket_server_side_encryption_configuration" {
+  type = list(object({
+    id                       = number
+    bucket_id                = any
+    expected_bucket_owner_id = optional(any)
+    rule = list(object({
+      bucket_key_enabled = optional(bool)
+      apply_server_side_encryption_by_default = optional(list(object({
+        sse_algorithm     = string
+        kms_master_key_id = optional(any)
+      })))
+    }))
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_server_side_encryption_configuration : true if contains(["AES256", "aws:kms", "aws:kms:dsse"], a.rule.apply_server_side_encryption_by_default.sse_algorithm)
+    ]) == length(var.bucket_server_side_encryption_configuration)
+    error_message = "Valid values are AES256, aws:kms or aws:kms:dsse."
+  }
+}
+
+variable "bucket_versioning" {
+  type = list(object({
+    id                    = number
+    bucket_id             = any
+    expected_bucket_owner = optional(any)
+    mfa                   = optional(string)
+    versioning_configuration = optional(list(object({
+      status     = string
+      mfa_delete = optional(string)
+    })), [])
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_versioning : true if contains(["Enabled", "Disabled"], a.versioning_configuration.status)
+    ]) == length(var.bucket_versioning)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+
+  validation {
+    condition = length([
+      for b in var.bucket_versioning : true if contains(["Enabled", "Disabled"], b.versioning_configuration.mfa_delete)
+    ]) == length(var.bucket_versioning)
+    error_message = "Valid values are Enabled or Disabled."
+  }
+}
+
+variable "bucket_website_configuration" {
+  type = list(object({
+    id                       = number
+    bucket_id                = any
+    expected_bucket_owner_id = optional(any)
+    routing_rules            = optional(string)
+    error_document = optional(list(object({
+      key = string
+    })), [])
+    index_document = optional(list(object({
+      suffix = string
+    })), [])
+    redirect_all_requests_to = optional(list(object({
+      host_name = string
+      protocol  = optional(string)
+    })), [])
+    routing_rule = optional(list(object({
+      condition = optional(list(object({
+        http_error_code_returned_equals = optional(string)
+        key_prefix_equals               = optional(string)
+      })), [])
+      redirect = optional(list(object({
+        host_name               = optional(string)
+        http_redirect_code      = optional(string)
+        protocol                = optional(string)
+        replace_key_prefix_with = optional(string)
+        replace_key_with        = optional(string)
+      })), [])
+    })), [])
+  }))
+  default = []
+
+  validation {
+    condition = length([
+      for a in var.bucket_website_configuration : true if contains(["http", "https"], a.redirect_all_requests_to.protocol)
+    ]) == length(var.bucket_website_configuration)
+    error_message = "Valid values are http or https."
+  }
+
+  validation {
+    condition = length([
+      for b in var.bucket_website_configuration : true if contains(["http", "https"], b.routing_rule.redirect.protocol)
+    ]) == length(var.bucket_website_configuration)
+    error_message = "Valid values are http or https."
   }
 }
