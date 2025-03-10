@@ -4,6 +4,18 @@ output "s3_bucket_id" {
   )
 }
 
+output "bucket_name" {
+  value = try(aws_s3_bucket.this.*.bucket)
+}
+
+output "s3_bucket_region" {
+  value = try(aws_s3_bucket.this.*.region)
+}
+
+output "bucket_prefix" {
+  value = try(aws_s3_bucket.this.*.bucket_prefix)
+}
+
 output "s3_bucket_arn" {
   value = try(aws_s3_bucket.this.*.arn)
 }
