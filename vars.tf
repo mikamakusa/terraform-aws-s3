@@ -404,7 +404,7 @@ variable "bucket_object" {
     content_type                  = optional(string)
     etag                          = optional(string)
     force_destroy                 = optional(bool)
-    id                            = optional(string)
+    object_id                     = optional(string)
     kms_key_id                    = optional(any)
     metadata                      = optional(map(string))
     object_lock_legal_hold_status = optional(string)

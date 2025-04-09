@@ -436,7 +436,7 @@ resource "aws_s3_bucket_object" "this" {
   content_type        = lookup(var.bucket_object[count.index], "content_type")
   etag                = filemd5(join("/", [path.cwd, "etag", lookup(var.bucket_object[count.index], "etag")]))
   force_destroy       = lookup(var.bucket_object[count.index], "force_destroy")
-  id                  = lookup(var.bucket_object[count.index], "id")
+  id                  = lookup(var.bucket_object[count.index], "object_id")
   kms_key_id = try(
     element(var.bucket_object_kms_key_arn, lookup(var.bucket_object[count.index], "kms_key_id"))
   )
